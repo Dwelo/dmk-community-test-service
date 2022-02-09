@@ -1,0 +1,50 @@
+# This file is the main config file for your service.
+
+service:
+  name: dmk-community-test-service
+  awsKmsKeyArn: arn:aws:kms:us-west-1:790585139892:key/f9187466-7568-4816-a7cf-6f41a39e1569   # cloud-service-lambda-key, needed to decrypt env vars
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: us-west-1
+  stage: ${opt:stage, 'dev'}
+  apiGateway:
+    description: DMK Community Test service
+  environment:
+    DATADOG_API_KEY: ${ssm:/${self:service.name}/${self:provider.stage}/datadog-api-key~true}
+    DATADOG_APP_KEY: ${ssm:/${self:service.name}/${self:provider.stage}/datadog-app-key~true}
+    DMK_TEST_SERVICE_LAMBDA_KEY: ${ssm:/${self:service.name}/service-api-key~true}
+    DWELO_ENV: "QA"
+    LOG_LEVEL: "WARNING"
+    SERVICE: ${self:service.name}
+    STAGE: ${self:provider.stage}
+  vpc:
+    subnetIds:
+      - ${ssm:/${self:service.name}/${self:provider.stage}/subnet-id1}
+      - ${ssm:/${self:service.name}/${self:provider.stage}/subnet-id2}
+    securityGroupIds:
+      - ${ssm:/${self:service.name}/${self:provider.stage}/security-group-id1}
+  tags:
+    service: ${self:service.name}
+    stage: ${self:provider.stage}
+
+package:
+  exclude:
+    - .git/**
+    - test/**
+    - venv/**
+    - README.md
+
+functions:
+  dmk_community_test_service_function:
+    handler: src/dmk_community_test_service_function.lambda_handler
+    layers:
+      - arn:aws:lambda:us-west-1:464622532012:layer:Datadog-Python36-metric:2
+      - arn:aws:lambda:us-west-1:790585139892:layer:DweloCommonLambdas:56
+    events:
+      - eventBridge:
+          enabled: false
+          schedule: rate(10 minutes)
+          input:
+            somekey: somevalue

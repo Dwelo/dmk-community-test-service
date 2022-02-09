@@ -21,13 +21,13 @@ from suds.sax.element import Element
 from suds.transport.http import HttpTransport
 from dwelo.s3_file_manager import S3FileManager
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)       # TODO - parameterize
+logger = logging.getLogger(__name__)
+log_level = os.environ.get('LOG_LEVEL', 'WARNING')
+logger.setLevel(log_level)
 
 
 # ENV VARS NEEDED:
 #   export DWELO_ENV=QA
-#   export DMK_TEST_SERVICE_LAMBDA_KEY=909fb0b6-49dc-4b7a-b6b3-9073a8f17cdf
 
 # MYSQL test data:
 #   insert into DormakabaPropertyConfig (uid, date_registered, last_modified, is_active, dmk_server_url,

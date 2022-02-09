@@ -1,0 +1,39 @@
+language: node_js
+
+if: branch IN (qa, master) OR tag IS present
+
+node_js:
+  - node
+
+install:
+  - npm install -g serverless
+
+script: true
+
+# Deploys use the AWS keys of the ci-lambda role user.
+deploy:
+  - on:
+      tags: false
+      branch: qa
+    provider: script
+    script: serverless deploy --stage qa
+  - on:
+      tags: false
+      branch: master
+    provider: script
+    script: serverless deploy --stage staging
+  - on:
+      tags: true
+      branch: master
+    provider: script
+    script: serverless deploy --stage prod
+
+notifications:
+  slack:
+    rooms:
+      - dwelo:OSOfHeZjvP6mEVNfii0UNGRb#releases-announce
+    on_pull_requests: false
+    on_success: always
+    on_failure: never
+    template:
+      - "Deployment of build <%{build_url}|#%{build_number}> (<%{compare_url}|%{commit}>) of %{repository_slug} *%{branch}* branch has completed, see build link for deployment info."
