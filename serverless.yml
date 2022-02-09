@@ -1,7 +1,6 @@
 # This file is the main config file for your service.
 
-service:
-  name: dmk-community-test-service
+service: dmk-community-test-service
   awsKmsKeyArn: arn:aws:kms:us-west-1:790585139892:key/f9187466-7568-4816-a7cf-6f41a39e1569   # cloud-service-lambda-key, needed to decrypt env vars
 
 provider:
