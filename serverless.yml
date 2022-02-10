@@ -1,43 +1,54 @@
 # This file is the main config file for your service.
 
-service: dmk-community-test-service
-  awsKmsKeyArn: arn:aws:kms:us-west-1:790585139892:key/f9187466-7568-4816-a7cf-6f41a39e1569   # cloud-service-lambda-key, needed to decrypt env vars
+service: dmk-test-service
+custom:
+  service-name: dmk-test-service
 
 provider:
   name: aws
   runtime: python3.9
   region: us-west-1
   stage: ${opt:stage, 'dev'}
+  timeout: 120
   apiGateway:
     description: DMK Community Test service
   environment:
-    DATADOG_API_KEY: ${ssm:/${self:service.name}/${self:provider.stage}/datadog-api-key~true}
-    DATADOG_APP_KEY: ${ssm:/${self:service.name}/${self:provider.stage}/datadog-app-key~true}
-    DMK_TEST_SERVICE_LAMBDA_KEY: ${ssm:/${self:service.name}/service-api-key~true}
-    DWELO_ENV: "QA"
-    LOG_LEVEL: "WARNING"
-    SERVICE: ${self:service.name}
+    DATADOG_API_KEY: ${ssm:/${self:custom.service-name}/${self:provider.stage}/datadog-api-key}
+    DATADOG_APP_KEY: ${ssm:/${self:custom.service-name}/${self:provider.stage}/datadog-app-key}
+    DMK_TEST_SERVICE_LAMBDA_KEY: ${ssm:/${self:custom.service-name}/service-api-key}
+    DWELO_ENV: 'QA'
+    LOG_LEVEL: 'INFO'
+    SERVICE: ${self:custom.service-name}
     STAGE: ${self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 's3:GetObject'
+          Resource:
+            - 'arn:aws:s3:::dwelo-config/*'
   vpc:
     subnetIds:
-      - ${ssm:/${self:service.name}/${self:provider.stage}/subnet-id1}
-      - ${ssm:/${self:service.name}/${self:provider.stage}/subnet-id2}
+      - ${ssm:/${self:custom.service-name}/${self:provider.stage}/subnet-id1}
+      - ${ssm:/${self:custom.service-name}/${self:provider.stage}/subnet-id2}
     securityGroupIds:
-      - ${ssm:/${self:service.name}/${self:provider.stage}/security-group-id1}
+      - ${ssm:/${self:custom.service-name}/${self:provider.stage}/security-group-id1}
   tags:
-    service: ${self:service.name}
+    service: ${self:custom.service-name}
     stage: ${self:provider.stage}
 
 package:
-  exclude:
-    - .git/**
-    - test/**
-    - venv/**
-    - README.md
+  patterns:
+    - '!test/**'
+    - '!venv/**'
+    - '!.travis.yml'
+    - '!README.md'
 
 functions:
-  dmk_community_test_service_function:
-    handler: src/dmk_community_test_service_function.lambda_handler
+  function:
+    handler: src/lambda_function.lambda_handler
+    awsKmsKeyArn: arn:aws:kms:us-west-1:790585139892:key/f9187466-7568-4816-a7cf-6f41a39e1569   # cloud-service-lambda-key, needed to decrypt env vars
     layers:
       - arn:aws:lambda:us-west-1:464622532012:layer:Datadog-Python36-metric:2
       - arn:aws:lambda:us-west-1:790585139892:layer:DweloCommonLambdas:56
