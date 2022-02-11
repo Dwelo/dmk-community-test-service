@@ -9,14 +9,13 @@ provider:
   runtime: python3.9
   region: us-west-1
   stage: ${opt:stage, 'dev'}
-  timeout: 120
+  timeout: 180  # make sure there is time for an error state to be handled
   apiGateway:
     description: DMK Community Test service
   environment:
     DATADOG_API_KEY: ${ssm:/${self:custom.service-name}/${self:provider.stage}/datadog-api-key}
     DATADOG_APP_KEY: ${ssm:/${self:custom.service-name}/${self:provider.stage}/datadog-app-key}
     DMK_TEST_SERVICE_LAMBDA_KEY: ${ssm:/${self:custom.service-name}/service-api-key}
-    DWELO_ENV: 'QA'
     LOG_LEVEL: 'INFO'
     SERVICE: ${self:custom.service-name}
     STAGE: ${self:provider.stage}

@@ -21,27 +21,12 @@ from suds.sax.element import Element
 from suds.transport.http import HttpTransport
 from dwelo.s3_file_manager import S3FileManager
 
+# Logging
 logger = logging.getLogger(__name__)
 log_level = os.environ.get('LOG_LEVEL', 'WARNING')
 logger.setLevel(log_level)
 
-
-# ENV VARS NEEDED:
-#   export DWELO_ENV=QA
-
-# MYSQL test data:
-#   insert into DormakabaPropertyConfig (uid, date_registered, last_modified, is_active, dmk_server_url,
-#       api_user_name, api_user_password, community_id, mobile_key_enabled)
-#   values (4, '2020-11-03 19:26:46', '2021-12-14 18:21:46', 1,
-#       'https://63.158.87.66/CommunityPMSService.asmx?singleWsdl', 'DWELO', 'Admin01', 12600000, 0);
-
-# Had to add this permission to the service role
-#   AWSLambdaS3ExecutionRole-4d70b7b7-ec5b-4c33-bd3a-9226f6fa1cf9
-
-# Had to set the Lambda timeout to 2 minutes. Maybe should be 2:10 though.
-
-
-# Auth token needed to authenticate with endpoint
+# Token needed to authenticate with special endpoint on cloud host.
 auth_token = os.environ.get('DMK_TEST_SERVICE_LAMBDA_KEY')
 if not auth_token:
     logger.error(f"ERROR - DMK_TEST_SERVICE_LAMBDA_KEY not found")
@@ -50,7 +35,25 @@ if not auth_token:
 session = requests.Session()
 session.headers = {'Authorization': auth_token}
 
-host = "https://cloudapi-dmk-community-test-lambda-endpoint.n.dwelo.com"    # TODO - parameterize
+# Possible values of STAGE are ['dev', 'qa', 'staging', 'prod']
+STAGE = os.environ.get('STAGE').lower()
+
+S3_CERT_FOLDER = {
+    'dev': 'dev',
+    'qa': 'qa',
+    'staging': 'stg',
+    'prod': 'prd',
+}
+
+DMK_COMMUNITIES_URL = "/v3/integrations/dormakaba/lambda/"
+
+CLOUD_HOST = {
+    # Feature branches require manually adding an env var with the host, i.e. https://cloudapi-BRANCH-SLUG.n.dwelo.com
+    'dev': os.environ.get('FEATURE_BRANCH_HOST', 'https://cloudapi.n.dwelo.com'),
+    'qa': 'https://api.qa.dwelo.com',
+    'staging': 'https://api.stg.dwelo.com/',
+    'prod': 'https://api.dwelo.com/',
+}
 
 
 class ClientHttpsTransport(HttpTransport):
@@ -75,8 +78,7 @@ def get_dmk_community_list_from_cloud():
     """ Query cloudapi for the list of DMK communities to be tested
     """
     try:
-        DMK_COMMUNITIES_URL = "/v3/integrations/dormakaba/lambda/"
-        url = urllib.parse.urljoin(host, DMK_COMMUNITIES_URL)
+        url = urllib.parse.urljoin(CLOUD_HOST[STAGE], DMK_COMMUNITIES_URL)
         logger.info(f"Requesting DMK community list from: {url=}")
 
         r = session.get(url)
@@ -95,12 +97,10 @@ def get_dmk_community_list_from_cloud():
 
 def download_cert_files_for_community(community_uid):
 
-    env = os.environ.get("DWELO_ENV").lower()
-
     # Store certs in the /tmp folder. The AWS Lambda docs state:
-    #   "Each execution environment provides 512 MB of disk space in the /tmp directory.
-    #    The directory content remains when the execution environment is frozen, providing
-    #    a transient cache that can be used for multiple invocations."
+    #    "Each execution environment provides 512 MB of disk space in the /tmp directory.
+    #     The directory content remains when the execution environment is frozen, providing
+    #     a transient cache that can be used for multiple invocations."
     local_cert_dir = os.path.join("/tmp", "cert_files")
 
     cert_filename = f"dmk-{community_uid}-cert.pem"
@@ -115,7 +115,7 @@ def download_cert_files_for_community(community_uid):
         # Make sure we have the SSL cert files copied locally.
         file_manager = S3FileManager(
             s3_bucket_name=f"dwelo-config",
-            s3_bucket_subdir=f"cloud-api/certs/{env}",
+            s3_bucket_subdir=f"cloud-api/certs/{S3_CERT_FOLDER[STAGE]}",
             local_dir=local_cert_dir
         )
         file_manager.get_files([cert_filename, pk_filename, ca_filename])
@@ -195,7 +195,6 @@ def test_connection_to_community(community):
 
 
 def lambda_handler(event, context):
-
     communities = get_dmk_community_list_from_cloud()
     for community in communities:
         success = test_connection_to_community(community)
